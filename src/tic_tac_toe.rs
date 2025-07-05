@@ -1,46 +1,60 @@
-use dioxus::{prelude::*};
+use dioxus::{logger::tracing, prelude::*};
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct GameState {
-    player: Signal<String>,
+    player: char,
+    reset: bool
 }
+
 
 #[component]
 pub fn TicTacToe() -> Element {
-    let mut state = use_signal(|| "X".to_string());
-    use_context_provider(|| GameState{ player: state });
-
-    let mut reset = use_signal(|| false);
-
+    use_context_provider(|| Signal::new(GameState{ player: 'X', reset: false }));
+    tracing::info!("tic tac toe");
     rsx! {
         h1 { "Tic Tac Toe" }
         div { id: "board",
             div { id: "game",
-                for _ in 0..9 { GameButton {reset_signal: reset} }
+                for _ in 0..9 { GameButton {} }
             }
-            button { 
-                onclick: move |_| {
-                    reset.set(true);
-                    state.set("X".to_string());
-                },
-                "Reset"
-            }
+            ResetButton {}
         }
     }
 }
 
 #[component]
-pub fn GameButton(reset_signal: Signal<bool>) -> Element {
-    let mut state = use_signal(|| "".to_string());
-    if reset_signal.read().to_owned() { state.set("".to_string()); }
-    let play = move |_| {
-        if state.read().to_string() != "".to_string() { return; }
-        else { reset_signal.set(false); }
-        state.set(consume_context::<GameState>().player.read().to_string());
+pub fn ResetButton() -> Element {
+    let mut state = use_context::<Signal<GameState>>();
+    tracing::info!("reset button");
+    return rsx! {
+        button { 
+            onclick: move |_| {
+                state.set(GameState{ player: 'X', reset: true });
+            },
+            "Reset"
+        }
+    }
+}
 
-        let next = if state.read().to_string() == "X".to_string() { "O".to_string() } else { "X".to_string() };
-        consume_context::<GameState>().player.set(next);
+#[component]
+pub fn GameButton() -> Element {
+    tracing::info!("game button");
+    let mut state = use_signal(|| ' ');
+    let mut game_state = consume_context::<Signal<GameState>>();
+    
+    let play = move |_| {
+        if state() != ' ' { return; }
+        
+        state.set(game_state().player);
+        
+        let next = if state() == 'X' { 'O' } else { 'X' };
+        game_state.set(GameState {player: next, reset: false});
     };
+
+    use_effect(move ||{
+        if game_state().reset { state.set(' '); }
+    });
+    
     rsx! {
         button { id: "gameButton",
             onclick: play,
